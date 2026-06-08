@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Excel Dropdown</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <h2>Search</h2>
+  <input type="text" id="searchBox" placeholder="Type to filter..." oninput="filterList()" />
+  <select id="dropdown" size="10" style="width:300px; display:block; margin-top:10px;">
+    <option>Loading...</option>
+  </select>
+
+  <script>
+    const EXCEL_URL = "https://raw.githubusercontent.com/basiccoder1st/icd-tool/refs/heads/main/SimpleTabulation-ICD-11-MMS-en.txt";
+
+    let allItems = [];
+
+    // Load Excel and populate dropdown
+    async function loadExcel() {
+      const res = await fetch(EXCEL_URL);
+      const buffer = await res.arrayBuffer();
+      const workbook = XLSX.read(buffer);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(sheet);
+
+      // Change "ColumnName" to your actual Excel column header
+      allItems = data.map(row => row["ColumnName"]).filter(Boolean);
+      populateDropdown(allItems);
+    }
+
+    // Fill dropdown with items
+    function populateDropdown(items) {
+      const dropdown = document.getElementById("dropdown");
+      dropdown.innerHTML = items.map(i => `<option>${i}</option>`).join("");
+    }
+
+    // Filter as user types
+    function filterList() {
+      const query = document.getElementById("searchBox").value.toLowerCase();
+      const filtered = allItems.filter(i => i.toLowerCase().includes(query));
+      populateDropdown(filtered);
+    }
+
+    loadExcel();
+  </script>
+
+</body>
+</html>
