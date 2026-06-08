@@ -2,23 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Excel Dropdown</title>
+  <title>ICD-11 Code Search</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #searchBox { width: 400px; padding: 8px; font-size: 15px; }
+    #dropdown { width: 500px; display: block; margin-top: 8px; }
+    #dropdown option { padding: 6px; cursor: pointer; }
+    #status { font-size: 12px; color: gray; margin-top: 4px; }
+
+    #selected-list { margin-top: 20px; }
+    .selected-item {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #e8f0fe; border: 1px solid #aac4f5;
+      border-radius: 6px; padding: 6px 12px; margin: 4px;
+      font-size: 14px;
+    }
+    .remove-btn {
+      cursor: pointer; color: red; font-weight: bold;
+      border: none; background: none; font-size: 16px;
+    }
+    #copy-btn {
+      margin-top: 12px; padding: 8px 16px; cursor: pointer;
+      background: #1a73e8; color: white; border: none;
+      border-radius: 6px; font-size: 14px; display: none;
+    }
+  </style>
 </head>
 <body>
 
-  <h2>Search</h2>
-  <input type="text" id="searchBox" placeholder="Type to filter..." oninput="filterList()" />
-  <select id="dropdown" size="10" style="width:300px; display:block; margin-top:10px;">
-    <option>Loading...</option>
+  <h2>ICD-11 Code Search</h2>
+  <input type="text" id="searchBox" placeholder="Search code or description..." oninput="handleInput()" />
+  <div id="status">Loading...</div>
+  <select id="dropdown" size="10" ondblclick="addSelected()">
+    <option disabled>Loading codes...</option>
   </select>
+  <div style="font-size:12px; color:gray; margin-top:4px;">
+    Double-click or press Enter to add a code
+  </div>
+
+  <div id="selected-list"></div>
+  <button id="copy-btn" onclick="copyAll()">📋 Copy All Codes</button>
 
   <script>
     const EXCEL_URL = "https://raw.githubusercontent.com/basiccoder1st/icd-tool/refs/heads/main/SimpleTabulation-ICD-11-MMS-en.txt";
 
     let allItems = [];
+    let selectedItems = [];
 
-    // Load Excel and populate dropdown
+    // Load file
     async function loadExcel() {
       const res = await fetch(EXCEL_URL);
       const buffer = await res.arrayBuffer();
@@ -26,23 +58,99 @@
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json(sheet);
 
-      // Change "ColumnName" to your actual Excel column header
-      allItems = data.map(row => row["Code"]).filter(Boolean);
+      allItems = data.map(row => ({
+        code:  row["Code"] || "",
+        title: row["Title"] || row["LinearizationTitle"] || ""
+      })).filter(i => i.code && i.title);
+
       populateDropdown(allItems);
+      document.getElementById("status").textContent = allItems.length + " codes loaded — search above";
     }
 
-    // Fill dropdown with items
+    // Fill dropdown
     function populateDropdown(items) {
       const dropdown = document.getElementById("dropdown");
-      dropdown.innerHTML = items.map(i => `<option>${i}</option>`).join("");
+      dropdown.innerHTML = items.length > 0
+        ? items.map(i => `<option value="${i.code}">${i.code} — ${i.title}</option>`).join("")
+        : `<option disabled>No results found</option>`;
     }
 
     // Filter as user types
-    function filterList() {
-      const query = document.getElementById("searchBox").value.toLowerCase();
-      const filtered = allItems.filter(i => i.toLowerCase().includes(query));
+    function handleInput() {
+      const query = document.getElementById("searchBox").value.trim().toLowerCase();
+      if (query.length < 1) {
+        populateDropdown(allItems);
+        document.getElementById("status").textContent = allItems.length + " codes loaded";
+        return;
+      }
+      const filtered = allItems.filter(i =>
+        i.code.toLowerCase().includes(query) ||
+        i.title.toLowerCase().includes(query)
+      );
       populateDropdown(filtered);
+      document.getElementById("status").textContent =
+        filtered.length > 0 ? `${filtered.length} results` : "No matches found";
     }
+
+    // Add on double-click or Enter
+    function addSelected() {
+      const dropdown = document.getElementById("dropdown");
+      const code = dropdown.value;
+      const title = dropdown.options[dropdown.selectedIndex]?.text;
+      if (!code || !title) return;
+
+      // Prevent duplicates
+      if (selectedItems.find(i => i.code === code)) {
+        document.getElementById("status").textContent = `"${code}" already added`;
+        return;
+      }
+
+      selectedItems.push({ code, title });
+      renderSelected();
+    }
+
+    // Render selected tags
+    function renderSelected() {
+      const container = document.getElementById("selected-list");
+      const copyBtn = document.getElementById("copy-btn");
+
+      if (selectedItems.length === 0) {
+        container.innerHTML = "";
+        copyBtn.style.display = "none";
+        return;
+      }
+
+      container.innerHTML = `
+        <strong>Selected Codes (${selectedItems.length}):</strong><br><br>` +
+        selectedItems.map((i, idx) => `
+          <span class="selected-item">
+            <strong>${i.code}</strong> — ${i.title}
+            <button class="remove-btn" onclick="removeItem(${idx})">×</button>
+          </span>
+        `).join("");
+
+      copyBtn.style.display = "inline-block";
+    }
+
+    // Remove a tag
+    function removeItem(idx) {
+      selectedItems.splice(idx, 1);
+      renderSelected();
+    }
+
+    // Copy all codes to clipboard
+    function copyAll() {
+      const text = selectedItems.map(i => `${i.code} — ${i.title}`).join("\n");
+      navigator.clipboard.writeText(text).then(() => {
+        document.getElementById("copy-btn").textContent = "✅ Copied!";
+        setTimeout(() => document.getElementById("copy-btn").textContent = "📋 Copy All Codes", 2000);
+      });
+    }
+
+    // Enter key to add
+    document.addEventListener("keydown", e => {
+      if (e.key === "Enter") addSelected();
+    });
 
     loadExcel();
   </script>
