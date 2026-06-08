@@ -27,7 +27,7 @@
       const data = XLSX.utils.sheet_to_json(sheet);
 
       // Change "ColumnName" to your actual Excel column header
-      allItems = data.map(row => row["ColumnName"]).filter(Boolean);
+      allItems = data.map(row => row["Code"]).filter(Boolean);
       populateDropdown(allItems);
     }
 
